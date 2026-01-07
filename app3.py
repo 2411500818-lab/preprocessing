@@ -4,170 +4,216 @@ import re
 import math
 from collections import Counter
 import matplotlib.pyplot as plt
-import numpy as np
 from wordcloud import WordCloud
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
 
 # ===================== CONFIG =====================
-st.set_page_config(page_title="NLP Pipeline", layout="wide")
-st.title("🧠 NLP Text Analysis Pipeline")
+st.set_page_config(page_title="NLP Text Analysis", layout="wide")
+st.title("🧠 NLP Text Analysis")
 
-# ===================== NORMALIZATION =====================
+# ===================== SIDEBAR METODE =====================
+st.sidebar.title("📌 Metode Penelitian")
+st.sidebar.markdown("""
+### 1️⃣ Preprocessing
+✔ Tokenisasi  
+✔ Stopword Removal  
+✔ Normalisasi  
+
+### 2️⃣ Feature Extraction
+✔ TF-IDF  
+
+### 3️⃣ Pemodelan
+✔ Naive Bayes  
+✔ KNN  
+
+### 4️⃣ Evaluasi Performa
+✔ Accuracy  
+""")
+
+# ===================== NORMALISASI & STOPWORD =====================
 normalisasi = {
     "gk": "tidak", "ga": "tidak", "nggak": "tidak",
     "bgt": "banget", "bgus": "bagus", "mantul": "mantap",
-    "bgs": "bagus", "apk": "aplikasi"
+    "apk": "aplikasi"
 }
 
 stopwords = set([
     "dan","yang","di","ke","dari","ini","itu","saya","aku","kamu",
-    "dia","adalah","untuk","dengan","pada","tidak","ya"
+    "dia","adalah","untuk","dengan","pada","ya"
 ])
 
-# ===================== UPLOAD =====================
+# ===================== UPLOAD DATA =====================
 file = st.file_uploader("📂 Upload file CSV", type=["csv"])
 
 if file:
     df = pd.read_csv(file)
     st.write("Jumlah data:", len(df))
+    st.dataframe(df)
+
     text_col = st.selectbox("Pilih kolom teks", df.columns)
 
     # ===================== PREPROCESSING =====================
+    st.subheader("1️⃣ Preprocessing")
+
     def clean_text(text):
-        text = str(text).lower()
+        text = str(text)
         text = re.sub(r"http\S+|www\S+", "", text)
         text = re.sub(r"\d+", "", text)
-        text = re.sub(r"[^a-z\s]", " ", text)
+        text = re.sub(r"[^a-zA-Z\s]", " ", text)
+        text = text.lower()
         words = text.split()
-        words = [normalisasi.get(w, w) for w in words if w not in stopwords]
+        words = [normalisasi.get(w, w) for w in words]
+        words = [w for w in words if w not in stopwords]
         return " ".join(words)
 
-    df["clean_text"] = df[text_col].apply(clean_text)
+    if st.button("🚀 Jalankan Analisis"):
+        df["clean_text"] = df[text_col].apply(clean_text)
 
-    # ===================== TABS =====================
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "1️⃣ Preprocessing",
-        "2️⃣ Feature Extraction (TF-IDF)",
-        "3️⃣ Pemodelan",
-        "4️⃣ Evaluasi Performa"
-    ])
+        st.write("📄 Hasil Clean Text")
+        st.dataframe(df[[text_col, "clean_text"]].head(10))
 
-    # ===================== TAB 1 =====================
-    with tab1:
-        st.subheader("Hasil Preprocessing")
-        st.dataframe(df[[text_col, "clean_text"]])
+        # ===================== TOKENISASI =====================
+        st.subheader("Tokenisasi")
+        df["tokens"] = df["clean_text"].apply(lambda x: x.split())
+        st.dataframe(df["tokens"].head(10))
 
-    # ===================== TF-IDF MANUAL =====================
-    docs = df["clean_text"].tolist()
-    N = len(docs)
+        # ===================== STATISTIK =====================
+        st.subheader("📊 Statistik")
+        total_words = sum(len(t) for t in df["tokens"])
+        st.write("Total kata:", total_words)
 
-    tf_list = []
-    df_counter = Counter()
+        # ===================== TF-IDF =====================
+        st.subheader("2️⃣ Feature Extraction (TF-IDF Manual)")
 
-    for doc in docs:
-        tf = Counter(doc.split())
-        tf_list.append(tf)
-        for w in tf:
-            df_counter[w] += 1
+        docs = df["clean_text"].tolist()
+        N = len(docs)
 
-    vocab = list(df_counter.keys())
-    vocab_index = {w: i for i, w in enumerate(vocab)}
+        tf_list = []
+        df_count = Counter()
 
-    tfidf_matrix = np.zeros((N, len(vocab)))
+        for doc in docs:
+            tf = Counter(doc.split())
+            tf_list.append(tf)
+            for w in tf:
+                df_count[w] += 1
 
-    for i, tf in enumerate(tf_list):
-        for w, c in tf.items():
-            idf = math.log((N + 1) / (df_counter[w] + 1)) + 1
-            tfidf_matrix[i, vocab_index[w]] = c * idf
+        tfidf = {}
+        for tf in tf_list:
+            for w, c in tf.items():
+                idf = math.log((N + 1) / (df_count[w] + 1)) + 1
+                tfidf[w] = tfidf.get(w, 0) + c * idf
 
-    tfidf_scores = tfidf_matrix.sum(axis=0)
-    tfidf_df = pd.DataFrame({
-        "Kata": vocab,
-        "Skor_TFIDF": tfidf_scores
-    }).sort_values(by="Skor_TFIDF", ascending=False)
+        tfidf_df = pd.DataFrame(tfidf.items(), columns=["Kata", "TF-IDF"])
+        tfidf_df = tfidf_df.sort_values(by="TF-IDF", ascending=False)
 
-    # ===================== TAB 2 =====================
-    with tab2:
-        st.subheader("🔟 Top 10 Kata TF-IDF")
         st.dataframe(tfidf_df.head(10))
 
+        # ===================== GRAFIK TF-IDF =====================
         fig, ax = plt.subplots()
         top10 = tfidf_df.head(10)
-        ax.barh(top10["Kata"], top10["Skor_TFIDF"])
+        ax.barh(top10["Kata"], top10["TF-IDF"])
         ax.invert_yaxis()
         st.pyplot(fig)
 
+        # ===================== WORDCLOUD =====================
         st.subheader("☁️ WordCloud")
         wc = WordCloud(width=800, height=400, background_color="white")
-        wc.generate_from_frequencies(
-            dict(zip(tfidf_df["Kata"], tfidf_df["Skor_TFIDF"]))
-        )
+        wc.generate_from_frequencies(tfidf)
         fig_wc, ax_wc = plt.subplots(figsize=(10, 5))
         ax_wc.imshow(wc)
         ax_wc.axis("off")
         st.pyplot(fig_wc)
 
-    # ===================== SENTIMENT =====================
-    positive_words = ["bagus","baik","mantap","suka","senang","puas","keren","cepat"]
-    negative_words = ["buruk","jelek","lambat","error","kecewa","parah","lemot"]
+        # ===================== SENTIMENT =====================
+        st.subheader("😊 Analisis Sentimen")
 
-    def sentiment(text):
-        score = 0
-        for w in text.split():
-            if w in positive_words:
-                score += 1
-            elif w in negative_words:
-                score -= 1
-        if score > 0:
-            return "Positive"
-        elif score < 0:
-            return "Negative"
-        return "Neutral"
+        positive_words = ["bagus","baik","mantap","suka","senang","puas","keren"]
+        negative_words = ["buruk","jelek","lambat","error","kecewa","parah"]
 
-    df["sentiment"] = df["clean_text"].apply(sentiment)
+        def sentiment(text):
+            score = 0
+            for w in text.split():
+                if w in positive_words:
+                    score += 1
+                elif w in negative_words:
+                    score -= 1
+            if score > 0:
+                return "Positive"
+            elif score < 0:
+                return "Negative"
+            return "Neutral"
 
-    label_map = {"Negative": 0, "Neutral": 1, "Positive": 2}
-    y = df["sentiment"].map(label_map)
+        df["sentiment"] = df["clean_text"].apply(sentiment)
+        st.dataframe(df[[text_col, "sentiment"]])
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        tfidf_matrix, y, test_size=0.2, random_state=42
-    )
+        # ===================== NAIVE BAYES =====================
+        st.subheader("3️⃣ Pemodelan (Naive Bayes Manual)")
 
-    # ===================== TAB 3 =====================
-    with tab3:
-        st.subheader("Pemodelan")
+        labels = df["sentiment"].unique()
+        label_count = df["sentiment"].value_counts().to_dict()
 
-        nb = MultinomialNB()
-        nb.fit(X_train, y_train)
-        nb_pred = nb.predict(X_test)
+        word_count = {l: Counter() for l in labels}
+        total_words_label = {l: 0 for l in labels}
 
-        knn = KNeighborsClassifier(n_neighbors=5)
-        knn.fit(X_train, y_train)
-        knn_pred = knn.predict(X_test)
+        for _, row in df.iterrows():
+            for w in row["clean_text"].split():
+                word_count[row["sentiment"]][w] += 1
+                total_words_label[row["sentiment"]] += 1
 
-        acc_nb = accuracy_score(y_test, nb_pred)
-        acc_knn = accuracy_score(y_test, knn_pred)
+        V = len(tfidf_df)
 
-        st.metric("Accuracy Naive Bayes", f"{acc_nb*100:.2f}%")
-        st.metric("Accuracy KNN", f"{acc_knn*100:.2f}%")
+        def predict_nb(text):
+            scores = {}
+            for l in labels:
+                prob = math.log(label_count[l] / len(df))
+                for w in text.split():
+                    prob += math.log((word_count[l].get(w, 0) + 1) /
+                                     (total_words_label[l] + V))
+                scores[l] = prob
+            return max(scores, key=scores.get)
 
-    # ===================== TAB 4 =====================
-    with tab4:
-        st.subheader("📊 Evaluasi Performa")
+        df["NB_Pred"] = df["clean_text"].apply(predict_nb)
 
-        fig, ax = plt.subplots()
-        models = ["Naive Bayes", "KNN"]
-        scores = [acc_nb, acc_knn]
-        ax.bar(models, scores)
-        ax.set_ylim(0, 1)
-        ax.set_ylabel("Accuracy")
-        st.pyplot(fig)
+        nb_acc = (df["NB_Pred"] == df["sentiment"]).mean() * 100
+        st.write("Accuracy Naive Bayes:", f"{nb_acc:.2f}%")
 
-        st.subheader("📈 Statistik TF-IDF")
-        st.write(f"Total kata dianalisis: {len(vocab)}")
-        st.write(f"TF-IDF tertinggi: {tfidf_df['Skor_TFIDF'].max():.4f}")
-        st.write(f"TF-IDF terendah: {tfidf_df['Skor_TFIDF'].min():.4f}")
-        st.write(f"TF-IDF rata-rata: {tfidf_df['Skor_TFIDF'].mean():.4f}")
+        # ===================== KNN MANUAL =====================
+        st.subheader("KNN Manual (k=3)")
+
+        def cosine_sim(a, b):
+            return sum(a[w]*b[w] for w in a if w in b) / (
+                math.sqrt(sum(v*v for v in a.values())) *
+                math.sqrt(sum(v*v for v in b.values())) + 1e-9
+            )
+
+        tf_vectors = []
+        for doc in docs:
+            vec = Counter(doc.split())
+            tf_vectors.append(vec)
+
+        def predict_knn(idx, k=3):
+            sims = []
+            for i, vec in enumerate(tf_vectors):
+                if i != idx:
+                    sims.append((cosine_sim(tf_vectors[idx], vec), df.iloc[i]["sentiment"]))
+            sims.sort(reverse=True)
+            top = sims[:k]
+            return Counter([s[1] for s in top]).most_common(1)[0][0]
+
+        df["KNN_Pred"] = [predict_knn(i) for i in range(len(df))]
+        knn_acc = (df["KNN_Pred"] == df["sentiment"]).mean() * 100
+        st.write("Accuracy KNN:", f"{knn_acc:.2f}%")
+
+        # ===================== GRAFIK AKURASI =====================
+        st.subheader("4️⃣ Evaluasi Performa")
+        fig_acc, ax_acc = plt.subplots()
+        ax_acc.bar(["Naive Bayes", "KNN"], [nb_acc, knn_acc])
+        ax_acc.set_ylabel("Accuracy (%)")
+        st.pyplot(fig_acc)
+
+        # ===================== DOWNLOAD =====================
+        st.download_button(
+            "⬇️ Download Hasil",
+            df.to_csv(index=False),
+            "hasil_nlp_final.csv",
+            "text/csv"
+        )
