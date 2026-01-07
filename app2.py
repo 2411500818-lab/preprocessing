@@ -5,11 +5,10 @@ import math
 from collections import Counter
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
-from gensim.models import Word2Vec
 
 # ===================== CONFIG =====================
-st.set_page_config(page_title="NLP Twitter Analysis", layout="wide")
-st.title("🧠 Analisis NLP Teks (Preprocessing, TF-IDF, WordCloud, Sentiment, Naive Bayes)")
+st.set_page_config(page_title="NLP Text Analysis", layout="wide")
+st.title("🧠 Analisis NLP Teks (Preprocessing, TF-IDF, Sentiment, Naive Bayes)")
 
 # ===================== NORMALISASI & STOPWORD =====================
 normalisasi = {
@@ -46,7 +45,7 @@ if file:
     use_normalisasi = st.sidebar.checkbox("Normalisasi Kata", True)
     remove_stopword = st.sidebar.checkbox("Stopword Removal", True)
 
-    def clean_text(text):
+    def preprocess(text):
         text = str(text)
         if remove_url:
             text = re.sub(r"http\S+|www\S+", "", text)
@@ -65,34 +64,24 @@ if file:
 
     if st.button("🚀 Jalankan Analisis"):
 
-        # ===================== CASE FOLDING =====================
-        st.header("1️⃣ Case Folding")
-        df["case_folding"] = df[text_col].str.lower()
-        st.dataframe(df[[text_col, "case_folding"]].head())
-
         # ===================== TOKENISASI =====================
-        st.header("2️⃣ Tokenisasi")
-        df["token"] = df["case_folding"].apply(lambda x: str(x).split())
+        st.header("1️⃣ Tokenisasi")
+        df["token"] = df[text_col].apply(preprocess)
         st.write(df["token"].head())
 
-        # ===================== NORMALISASI + STOPWORD =====================
-        st.header("3️⃣ Normalisasi & Stopword Removal")
-        df["clean_token"] = df[text_col].apply(clean_text)
-        st.write(df["clean_token"].head())
-
         # ===================== CLEAN TEXT =====================
-        st.header("🧹 Clean Text Final")
-        df["clean_text"] = df["clean_token"].apply(lambda x: " ".join(x))
+        st.header("2️⃣ Clean Text")
+        df["clean_text"] = df["token"].apply(lambda x: " ".join(x))
         st.dataframe(df[[text_col, "clean_text"]].head())
 
         # ===================== STATISTIK DATA =====================
         st.header("📊 Statistik Data")
         c1, c2, c3 = st.columns(3)
         c1.metric("Jumlah Data", len(df))
-        c2.metric("Total Kata", sum(len(x) for x in df["clean_token"]))
+        c2.metric("Total Kata", sum(len(x) for x in df["token"]))
         c3.metric("Rata-rata Panjang Teks", round(df["clean_text"].str.len().mean(), 2))
 
-        # ===================== TF-IDF MANUAL =====================
+        # ===================== TF-IDF =====================
         st.header("📐 Feature Extraction: TF-IDF")
 
         docs = df["clean_text"].tolist()
@@ -133,14 +122,7 @@ if file:
         ax_wc.axis("off")
         st.pyplot(fig_wc)
 
-        # ===================== WORD EMBEDDINGS =====================
-        st.header("📐 Word Embeddings (Word2Vec)")
-        sentences = df["clean_token"].tolist()
-        w2v = Word2Vec(sentences, vector_size=50, window=5, min_count=1)
-        st.write("Contoh vektor kata:")
-        st.write(w2v.wv[sentences[0][0]])
-
-        # ===================== SENTIMENT ANALYSIS =====================
+        # ===================== SENTIMENT =====================
         st.header("😊 Analisis Sentimen")
 
         def sentiment(text):
@@ -163,8 +145,8 @@ if file:
         ax2.pie(sent_count, labels=sent_count.index, autopct="%1.1f%%")
         st.pyplot(fig2)
 
-        # ===================== NAIVE BAYES MANUAL =====================
-        st.header("🤖 Pemodelan: Naive Bayes")
+        # ===================== NAIVE BAYES =====================
+        st.header("🤖 Naive Bayes")
 
         labels = df["sentiment"].unique()
         label_count = df["sentiment"].value_counts().to_dict()
@@ -191,7 +173,7 @@ if file:
 
         df["nb_prediction"] = df["clean_text"].apply(predict_nb)
 
-        # ===================== EVALUASI MODEL =====================
+        # ===================== EVALUASI =====================
         st.header("📊 Evaluasi Model")
 
         accuracy = (df["sentiment"] == df["nb_prediction"]).mean()
@@ -220,6 +202,6 @@ if file:
         st.download_button(
             "⬇️ Download Hasil Analisis",
             df.to_csv(index=False),
-            "hasil_nlp_lengkap.csv",
+            "hasil_nlp_final.csv",
             "text/csv"
         )
