@@ -35,7 +35,7 @@ if file:
     st.write("Jumlah data:", len(df))
     text_col = st.selectbox("Pilih kolom teks", df.columns)
 
-    # ===================== CLEAN TEXT =====================
+    # ===================== PREPROCESSING =====================
     def clean_text(text):
         text = str(text).lower()
         text = re.sub(r"http\S+|www\S+", "", text)
@@ -91,7 +91,7 @@ if file:
 
     # ===================== TAB 2 =====================
     with tab2:
-        st.subheader("Top 10 Kata TF-IDF")
+        st.subheader("🔟 Top 10 Kata TF-IDF")
         st.dataframe(tfidf_df.head(10))
 
         fig, ax = plt.subplots()
@@ -100,7 +100,7 @@ if file:
         ax.invert_yaxis()
         st.pyplot(fig)
 
-        st.subheader("WordCloud")
+        st.subheader("☁️ WordCloud")
         wc = WordCloud(width=800, height=400, background_color="white")
         wc.generate_from_frequencies(
             dict(zip(tfidf_df["Kata"], tfidf_df["Skor_TFIDF"]))
@@ -110,7 +110,7 @@ if file:
         ax_wc.axis("off")
         st.pyplot(fig_wc)
 
-    # ===================== SENTIMENT LABEL =====================
+    # ===================== SENTIMENT =====================
     positive_words = ["bagus","baik","mantap","suka","senang","puas","keren","cepat"]
     negative_words = ["buruk","jelek","lambat","error","kecewa","parah","lemot"]
 
@@ -129,7 +129,6 @@ if file:
 
     df["sentiment"] = df["clean_text"].apply(sentiment)
 
-    # Encode label
     label_map = {"Negative": 0, "Neutral": 1, "Positive": 2}
     y = df["sentiment"].map(label_map)
 
@@ -156,4 +155,19 @@ if file:
         st.metric("Accuracy KNN", f"{acc_knn*100:.2f}%")
 
     # ===================== TAB 4 =====================
-    with
+    with tab4:
+        st.subheader("📊 Evaluasi Performa")
+
+        fig, ax = plt.subplots()
+        models = ["Naive Bayes", "KNN"]
+        scores = [acc_nb, acc_knn]
+        ax.bar(models, scores)
+        ax.set_ylim(0, 1)
+        ax.set_ylabel("Accuracy")
+        st.pyplot(fig)
+
+        st.subheader("📈 Statistik TF-IDF")
+        st.write(f"Total kata dianalisis: {len(vocab)}")
+        st.write(f"TF-IDF tertinggi: {tfidf_df['Skor_TFIDF'].max():.4f}")
+        st.write(f"TF-IDF terendah: {tfidf_df['Skor_TFIDF'].min():.4f}")
+        st.write(f"TF-IDF rata-rata: {tfidf_df['Skor_TFIDF'].mean():.4f}")
