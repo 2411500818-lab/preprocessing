@@ -110,34 +110,6 @@ if file:
         df["nb_prediction"] = df["clean_text"].apply(predict_nb)
         accuracy = (df["sentiment"] == df["nb_prediction"]).mean()
 
-          # ===================== KNN MANUAL =====================
-       st.subheader("KNN Manual (k=3)")
-
-        def cosine_sim(a, b):
-            return sum(a[w]*b[w] for w in a if w in b) / (
-                math.sqrt(sum(v*v for v in a.values())) *
-                math.sqrt(sum(v*v for v in b.values())) + 1e-9
-            )
-
-        tf_vectors = []
-        for doc in docs:
-            vec = Counter(doc.split())
-            tf_vectors.append(vec)
-
-        def predict_knn(idx, k=3):
-            sims = []
-            for i, vec in enumerate(tf_vectors):
-                if i != idx:
-                    sims.append((cosine_sim(tf_vectors[idx], vec), df.iloc[i]["sentiment"]))
-            sims.sort(reverse=True)
-            top = sims[:k]
-            return Counter([s[1] for s in top]).most_common(1)[0][0]
-
-        df["KNN_Pred"] = [predict_knn(i) for i in range(len(df))]
-        knn_acc = (df["KNN_Pred"] == df["sentiment"]).mean() * 100
-        st.write("Accuracy KNN:", f"{knn_acc:.2f}%")
-
-
         # ===================== TABS NAVIGASI =====================
         tab1, tab2, tab3, tab4 = st.tabs([
             "1️⃣ Preprocessing",
