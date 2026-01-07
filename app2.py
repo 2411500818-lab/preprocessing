@@ -6,83 +6,65 @@ from collections import Counter
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 
-# ===================== CONFIG =====================
-st.set_page_config(page_title="NLP Text Analysis", layout="wide")
-st.title("🧠 Analisis NLP Teks (Preprocessing, TF-IDF, Sentiment, Naive Bayes)")
+# ================= CONFIG =================
+st.set_page_config(page_title="NLP Research App", layout="wide")
+st.title("🧠 Analisis Teks NLP Berbasis Metode Penelitian")
 
-# ===================== NORMALISASI & STOPWORD =====================
+# ================= NORMALISASI =================
 normalisasi = {
     "gk": "tidak", "ga": "tidak", "nggak": "tidak",
-    "bgt": "banget", "bgus": "bagus", "mantul": "mantap",
-    "bgs": "bagus", "apk": "aplikasi"
+    "bgt": "banget", "apk": "aplikasi", "bgus": "bagus"
 }
 
-stopwords = set([
-    "dan","yang","di","ke","dari","ini","itu","saya","aku","kamu",
-    "dia","adalah","untuk","dengan","pada","tidak","ya"
-])
+stopwords = {
+    "dan","yang","di","ke","dari","ini","itu","saya","aku",
+    "kamu","dia","adalah","untuk","dengan","pada","tidak"
+}
 
-positive_words = ["bagus","baik","mantap","suka","senang","puas","keren","cepat"]
-negative_words = ["buruk","jelek","lambat","error","kecewa","parah","lemot"]
-
-# ===================== UPLOAD DATA =====================
-file = st.file_uploader("📤 Upload file CSV", type=["csv"])
+# ================= UPLOAD DATA =================
+file = st.file_uploader("📂 Upload file CSV", type=["csv"])
 
 if file:
     df = pd.read_csv(file)
-    st.subheader("📄 Data Awal")
+    st.subheader("📄 Data Asli")
     st.write("Jumlah data:", len(df))
     st.dataframe(df)
 
     text_col = st.selectbox("Pilih kolom teks", df.columns)
 
-    # ===================== PREPROCESSING OPTIONS =====================
-    st.sidebar.header("⚙️ Preprocessing")
-    casefold = st.sidebar.checkbox("Case Folding", True)
-    remove_url = st.sidebar.checkbox("Remove URL", True)
-    remove_symbol = st.sidebar.checkbox("Remove Symbol", True)
-    remove_number = st.sidebar.checkbox("Remove Number", True)
-    use_normalisasi = st.sidebar.checkbox("Normalisasi Kata", True)
-    remove_stopword = st.sidebar.checkbox("Stopword Removal", True)
+    # ================= 1. PREPROCESSING =================
+    st.sidebar.header("1️⃣ Preprocessing")
 
-    def preprocess(text):
+    casefold = st.sidebar.checkbox("Case Folding", True)
+    stopword_removal = st.sidebar.checkbox("Stopword Removal", True)
+    normalisasi_kata = st.sidebar.checkbox("Normalisasi Kata", True)
+
+    def preprocessing(text):
         text = str(text)
-        if remove_url:
-            text = re.sub(r"http\S+|www\S+", "", text)
-        if remove_number:
-            text = re.sub(r"\d+", "", text)
-        if remove_symbol:
-            text = re.sub(r"[^a-zA-Z\s]", " ", text)
+        text = re.sub(r"http\S+|www\S+", "", text)
+        text = re.sub(r"[^a-zA-Z\s]", " ", text)
         if casefold:
             text = text.lower()
         tokens = text.split()
-        if use_normalisasi:
-            tokens = [normalisasi.get(t, t) for t in tokens]
-        if remove_stopword:
-            tokens = [t for t in tokens if t not in stopwords]
+
+        if normalisasi_kata:
+            tokens = [normalisasi.get(w, w) for w in tokens]
+
+        if stopword_removal:
+            tokens = [w for w in tokens if w not in stopwords]
+
         return tokens
 
     if st.button("🚀 Jalankan Analisis"):
+        # ================= HASIL PREPROCESSING =================
+        df["tokens"] = df[text_col].apply(preprocessing)
+        df["clean_text"] = df["tokens"].apply(lambda x: " ".join(x))
 
-        # ===================== TOKENISASI =====================
-        st.header("1️⃣ Tokenisasi")
-        df["token"] = df[text_col].apply(preprocess)
-        st.write(df["token"].head())
+        st.subheader("🔹 Hasil Preprocessing")
+        st.dataframe(df[[text_col, "clean_text"]])
 
-        # ===================== CLEAN TEXT =====================
-        st.header("2️⃣ Clean Text")
-        df["clean_text"] = df["token"].apply(lambda x: " ".join(x))
-        st.dataframe(df[[text_col, "clean_text"]].head())
-
-        # ===================== STATISTIK DATA =====================
-        st.header("📊 Statistik Data")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Jumlah Data", len(df))
-        c2.metric("Total Kata", sum(len(x) for x in df["token"]))
-        c3.metric("Rata-rata Panjang Teks", round(df["clean_text"].str.len().mean(), 2))
-
-        # ===================== TF-IDF =====================
-        st.header("📐 Feature Extraction: TF-IDF")
+        # ================= 2. FEATURE EXTRACTION =================
+        st.subheader("2️⃣ Feature Extraction (TF-IDF Manual)")
 
         docs = df["clean_text"].tolist()
         N = len(docs)
@@ -102,19 +84,20 @@ if file:
                 idf = math.log((N + 1) / (df_counter[w] + 1)) + 1
                 tfidf[w] = tfidf.get(w, 0) + c * idf
 
-        tfidf_df = pd.DataFrame(tfidf.items(), columns=["Kata", "Skor_TFIDF"])
-        tfidf_df = tfidf_df.sort_values(by="Skor_TFIDF", ascending=False)
+        tfidf_df = pd.DataFrame(tfidf.items(), columns=["Kata", "Skor TF-IDF"])
+        tfidf_df = tfidf_df.sort_values(by="Skor TF-IDF", ascending=False)
 
-        st.subheader("🔟 10 Kata Teratas TF-IDF")
         st.dataframe(tfidf_df.head(10))
 
+        # ================= VISUAL TF-IDF =================
         fig, ax = plt.subplots()
-        ax.barh(tfidf_df.head(10)["Kata"], tfidf_df.head(10)["Skor_TFIDF"])
+        top10 = tfidf_df.head(10)
+        ax.barh(top10["Kata"], top10["Skor TF-IDF"])
         ax.invert_yaxis()
         st.pyplot(fig)
 
-        # ===================== WORDCLOUD =====================
-        st.header("☁️ WordCloud")
+        # ================= WORDCLOUD =================
+        st.subheader("☁️ WordCloud")
         wc = WordCloud(width=800, height=400, background_color="white")
         wc.generate_from_frequencies(tfidf)
         fig_wc, ax_wc = plt.subplots(figsize=(10, 5))
@@ -122,31 +105,22 @@ if file:
         ax_wc.axis("off")
         st.pyplot(fig_wc)
 
-        # ===================== SENTIMENT =====================
-        st.header("😊 Analisis Sentimen")
+        # ================= 3. PEMODELAN =================
+        st.subheader("3️⃣ Pemodelan (Naive Bayes Manual)")
 
-        def sentiment(text):
+        positive = {"bagus","mantap","puas","suka","baik","cepat"}
+        negative = {"buruk","jelek","lambat","error","kecewa"}
+
+        def label_sentiment(text):
             score = 0
             for w in text.split():
-                if w in positive_words:
-                    score += 1
-                if w in negative_words:
-                    score -= 1
-            if score > 0:
-                return "Positive"
-            elif score < 0:
-                return "Negative"
+                if w in positive: score += 1
+                if w in negative: score -= 1
+            if score > 0: return "Positive"
+            if score < 0: return "Negative"
             return "Neutral"
 
-        df["sentiment"] = df["clean_text"].apply(sentiment)
-
-        sent_count = df["sentiment"].value_counts()
-        fig2, ax2 = plt.subplots()
-        ax2.pie(sent_count, labels=sent_count.index, autopct="%1.1f%%")
-        st.pyplot(fig2)
-
-        # ===================== NAIVE BAYES =====================
-        st.header("🤖 Naive Bayes")
+        df["sentiment"] = df["clean_text"].apply(label_sentiment)
 
         labels = df["sentiment"].unique()
         label_count = df["sentiment"].value_counts().to_dict()
@@ -159,49 +133,29 @@ if file:
                 word_count[r["sentiment"]][w] += 1
                 total_words[r["sentiment"]] += 1
 
-        V = len(tfidf_df)
-        total_docs = len(df)
+        V = len(tfidf)
 
         def predict_nb(text):
             scores = {}
             for l in labels:
-                prob = math.log(label_count[l] / total_docs)
+                prob = math.log(label_count[l] / len(df))
                 for w in text.split():
                     prob += math.log((word_count[l].get(w, 0) + 1) / (total_words[l] + V))
                 scores[l] = prob
             return max(scores, key=scores.get)
 
-        df["nb_prediction"] = df["clean_text"].apply(predict_nb)
+        df["prediksi_nb"] = df["clean_text"].apply(predict_nb)
 
-        # ===================== EVALUASI =====================
-        st.header("📊 Evaluasi Model")
+        # ================= 4. EVALUASI =================
+        st.subheader("4️⃣ Evaluasi Performa")
+        acc = (df["sentiment"] == df["prediksi_nb"]).mean() * 100
+        st.metric("Accuracy", f"{acc:.2f}%")
 
-        accuracy = (df["sentiment"] == df["nb_prediction"]).mean()
+        st.dataframe(df[[text_col, "sentiment", "prediksi_nb"]])
 
-        TP = sum((df["sentiment"]=="Positive") & (df["nb_prediction"]=="Positive"))
-        FP = sum((df["sentiment"]!="Positive") & (df["nb_prediction"]=="Positive"))
-        FN = sum((df["sentiment"]=="Positive") & (df["nb_prediction"]!="Positive"))
-
-        precision = TP / (TP + FP) if TP+FP else 0
-        recall = TP / (TP + FN) if TP+FN else 0
-        f1 = 2 * precision * recall / (precision + recall) if precision+recall else 0
-
-        st.metric("Accuracy", f"{accuracy*100:.2f}%")
-        st.metric("Precision", f"{precision:.2f}")
-        st.metric("Recall", f"{recall:.2f}")
-        st.metric("F1-Score", f"{f1:.2f}")
-
-        # ===================== STATISTIK TF-IDF =====================
-        st.header("📊 Statistik Hasil TF-IDF")
-        st.write(f"• Total kata yang dianalisis: {len(tfidf_df)}")
-        st.write(f"• Skor TF-IDF tertinggi: {tfidf_df['Skor_TFIDF'].max():.4f}")
-        st.write(f"• Skor TF-IDF terendah: {tfidf_df['Skor_TFIDF'].min():.4f}")
-        st.write(f"• Skor TF-IDF rata-rata: {tfidf_df['Skor_TFIDF'].mean():.4f}")
-
-        # ===================== DOWNLOAD =====================
         st.download_button(
             "⬇️ Download Hasil Analisis",
             df.to_csv(index=False),
-            "hasil_nlp_final.csv",
+            "hasil_nlp_penelitian.csv",
             "text/csv"
         )
