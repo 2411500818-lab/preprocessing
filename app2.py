@@ -13,19 +13,19 @@ st.title("🧠 NLP Text Analysis – Metode Penelitian")
 # ===================== SIDEBAR METODE =====================
 st.sidebar.title("📌 Metode Penelitian")
 st.sidebar.markdown("""
-### 1️⃣ Preprocessing
-✔ Tokenisasi  
-✔ Stopword Removal  
-✔ Normalisasi  
+### Preprocessing
+ Tokenisasi  
+ Stopword Removal  
+ Normalisasi  
 
-### 2️⃣ Feature Extraction
-✔ TF-IDF  
+### Feature Extraction
+ TF-IDF  
 
-### 3️⃣ Pemodelan
-✔ Naive Bayes  
+### Pemodelan
+ Naive Bayes  
 
-### 4️⃣ Evaluasi Performa
-✔ Accuracy  
+### Evaluasi Performa
+ Accuracy  
 """)
 
 # ===================== NORMALISASI & STOPWORD =====================
